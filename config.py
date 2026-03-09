@@ -12,3 +12,4 @@ COMPETITOR_URLS = [
 
 DB_PATH = "posts.db"
 ROLLING_WINDOW_DAYS = 30
+
