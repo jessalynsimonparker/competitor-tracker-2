@@ -1,0 +1,11 @@
+[build]
+builder = "RAILPACK"
+
+[[services]]
+name = "web"
+startCommand = "python server.py"
+
+[[services]]
+name = "pipeline"
+startCommand = "python run_pipeline.py"
+cronSchedule = "0 9 * * 1"

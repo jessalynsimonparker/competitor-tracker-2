@@ -13,8 +13,9 @@ from config import (
 )
 from database import upsert_post, auto_flag_top_posts, get_all_posts
 
-# Set to True to skip BrightData and use existing Supabase data (saves credits)
-TEST_MODE = True
+# Set SCRAPER_TEST_MODE=false in Railway to run real BrightData scrapes
+import os as _os
+TEST_MODE = _os.environ.get("SCRAPER_TEST_MODE", "true").lower() != "false"
 
 TRIGGER_URL = "https://api.brightdata.com/datasets/v3/scrape"
 SNAPSHOT_URL = "https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}"
