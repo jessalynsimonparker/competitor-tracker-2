@@ -96,13 +96,38 @@
       list-style: none;
       margin: 0;
       padding: 0;
-      font-size: 0.78rem;
-      color: #4b5563;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
-    .post-list li { margin-bottom: 3px; }
-    .post-list a { color: #2563eb; text-decoration: none; }
-    .post-list a:hover { text-decoration: underline; }
+    .post-list li { margin: 0; }
+
+    .post-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.75rem;
+      color: #374151;
+      text-decoration: none;
+      max-width: 260px;
+      transition: background 0.15s;
+    }
+    .post-chip:hover { background: #e5e7eb; }
+    .post-chip .chip-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .post-chip .chip-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
 
     .show-more {
       background: none;
@@ -140,6 +165,33 @@
       color: #374151;
       cursor: pointer;
     }
+
+    .toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      font-size: 0.8rem;
+      color: #6b7280;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s;
+    }
+    .toggle-btn.active {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #b91c1c;
+    }
+    .toggle-btn .toggle-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #d1d5db;
+      transition: background 0.15s;
+    }
+    .toggle-btn.active .toggle-dot { background: #ef4444; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -419,9 +471,9 @@
       <option value="">All prospects</option>
       <option value="multi">2+ posts engaged</option>
     </select>
-    <label class="toggle-employees">
-      <input type="checkbox" id="hide-employees" checked> Hide employees
-    </label>
+    <button class="toggle-btn active" id="hide-employees" onclick="this.classList.toggle('active'); renderProfiles()">
+      <span class="toggle-dot"></span> Hide employees
+    </button>
   </div>
   <div class="stats-bar" id="profile-stats"></div>
   <table class="prospect-table">
@@ -637,7 +689,7 @@
     const search = document.getElementById("profile-search").value.toLowerCase();
     const company = document.getElementById("profile-company").value;
     const engagementFilter = document.getElementById("profile-engagement").value;
-    const hideEmployees = document.getElementById("hide-employees").checked;
+    const hideEmployees = document.getElementById("hide-employees").classList.contains("active");
 
     let filtered = allProfiles.filter(p => {
       if (hideEmployees && isEmployee(p)) return false;
@@ -665,14 +717,15 @@
       const hiddenCount = posts.length - 3;
       const pid = `posts-${p.id}`;
 
-      const postItems = visiblePosts.map(e =>
-        `<li><a href="${esc(e.post_url)}" target="_blank">${esc(e.company_name)}: ${esc(e.post_text)}…</a></li>`
-      ).join("");
+      const companyColors = { "Tulip Interfaces": "#6366f1", "Poka Inc ": "#f59e0b" };
+      const makeChip = e => {
+        const dot = companyColors[e.company_name] || "#9ca3af";
+        const text = (e.post_text || "").slice(0, 55) + (e.post_text?.length > 55 ? "…" : "");
+        return `<li><a class="post-chip" href="${esc(e.post_url)}" target="_blank"><span class="chip-dot" style="background:${dot}"></span><span class="chip-text">${esc(text)}</span></a></li>`;
+      };
 
-      const hiddenItems = hiddenCount > 0 ? posts.slice(3).map(e =>
-        `<li><a href="${esc(e.post_url)}" target="_blank">${esc(e.company_name)}: ${esc(e.post_text)}…</a></li>`
-      ).join("") : "";
-
+      const postItems = visiblePosts.map(makeChip).join("");
+      const hiddenItems = hiddenCount > 0 ? posts.slice(3).map(makeChip).join("") : "";
       const showMoreBtn = hiddenCount > 0
         ? `<li><button class="show-more" onclick="toggleMore('${pid}', this)">+ ${hiddenCount} more</button></li>`
         : "";
@@ -730,7 +783,7 @@
     if (tab === "profiles" && !allProfiles.length) loadProfiles();
   }
 
-  ["profile-search", "profile-company", "profile-engagement", "hide-employees"].forEach(id => {
+  ["profile-search", "profile-company", "profile-engagement"].forEach(id => {
     document.getElementById(id).addEventListener("input", renderProfiles);
     document.getElementById(id).addEventListener("change", renderProfiles);
   });
