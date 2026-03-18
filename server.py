@@ -5,16 +5,6 @@ from database import get_all_posts, flag_post, get_profiles
 app = Flask(__name__, static_folder="dashboard")
 
 
-@app.route("/api/debug")
-def api_debug():
-    url = os.environ.get("SUPABASE_URL", "NOT SET")
-    key = os.environ.get("SUPABASE_KEY", "NOT SET")
-    return jsonify({
-        "SUPABASE_URL": url,
-        "SUPABASE_KEY_prefix": key[:20] if key != "NOT SET" else "NOT SET",
-    })
-
-
 @app.route("/")
 def index():
     return send_from_directory("dashboard", "index.html")
