@@ -5,6 +5,141 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Competitor LinkedIn Post Tracker</title>
   <style>
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    .tab {
+      padding: 8px 20px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #6b7280;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+    }
+
+    .tab.active {
+      color: #1e293b;
+      border-bottom-color: #7c3aed;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 500;
+    }
+
+    .badge-company { background: #dbeafe; color: #1d4ed8; }
+    .badge-count { background: #f3f4f6; color: #374151; }
+    .badge-employee { background: #fee2e2; color: #b91c1c; }
+
+    .prospect-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      font-size: 0.875rem;
+    }
+
+    .prospect-table thead tr {
+      background: #1e293b;
+      color: #f1f5f9;
+      text-align: left;
+    }
+
+    .prospect-table th {
+      padding: 12px 14px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .prospect-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: top;
+    }
+
+    .prospect-table tr:last-child td { border-bottom: none; }
+    .prospect-table tr.is-employee { background: #fef2f2; }
+    .prospect-table tr:not(.is-employee):hover { background: #f8faff; }
+
+    .prospect-name {
+      font-weight: 600;
+      color: #1a1a2e;
+    }
+
+    .prospect-name a {
+      color: #1a1a2e;
+      text-decoration: none;
+    }
+
+    .prospect-name a:hover { text-decoration: underline; color: #2563eb; }
+
+    .prospect-title {
+      color: #4b5563;
+      font-size: 0.8rem;
+      margin-top: 2px;
+    }
+
+    .post-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      font-size: 0.78rem;
+      color: #4b5563;
+    }
+
+    .post-list li { margin-bottom: 3px; }
+    .post-list a { color: #2563eb; text-decoration: none; }
+    .post-list a:hover { text-decoration: underline; }
+
+    .show-more {
+      background: none;
+      border: none;
+      color: #6b7280;
+      font-size: 0.75rem;
+      cursor: pointer;
+      padding: 2px 0;
+      text-decoration: underline;
+    }
+
+    .filter-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-group input, .filter-group select {
+      padding: 7px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      background: #fff;
+    }
+
+    .filter-group input { width: 240px; }
+
+    .toggle-employees {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: #374151;
+      cursor: pointer;
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -227,6 +362,12 @@
 <h1>Competitor LinkedIn Post Tracker</h1>
 <p class="subtitle">30-day rolling window &bull; Week-over-week like tracking</p>
 
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('posts')">Posts</div>
+  <div class="tab" onclick="switchTab('profiles')">Profiles</div>
+</div>
+
+<div class="tab-content active" id="tab-posts">
 <div class="legend">
   <div class="legend-item"><div class="legend-swatch swatch-likes"></div> Likes increased</div>
   <div class="legend-item"><div class="legend-swatch swatch-flagged"></div> Flagged for PhantomBuster</div>
@@ -264,6 +405,37 @@
     <tr><td colspan="9" class="empty">Loading...</td></tr>
   </tbody>
 </table>
+</div>
+
+<div class="tab-content" id="tab-profiles">
+  <div class="filter-group">
+    <input type="text" id="profile-search" placeholder="Search name or title..." />
+    <select id="profile-company">
+      <option value="">All competitors</option>
+      <option value="Poka Inc ">Poka only</option>
+      <option value="Tulip Interfaces">Tulip only</option>
+    </select>
+    <select id="profile-engagement">
+      <option value="">All prospects</option>
+      <option value="multi">2+ posts engaged</option>
+    </select>
+    <label class="toggle-employees">
+      <input type="checkbox" id="hide-employees" checked> Hide employees
+    </label>
+  </div>
+  <div class="stats-bar" id="profile-stats"></div>
+  <table class="prospect-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Title & Company</th>
+        <th>Engaged With</th>
+        <th>Posts Liked</th>
+      </tr>
+    </thead>
+    <tbody id="profile-tbody"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
+  </table>
+</div>
 
 <script>
   let allPosts = [];
@@ -292,7 +464,7 @@
   function renderStats() {
     const total = allPosts.length;
     const increased = allPosts.filter(p => p.likes_increased).length;
-    const flagged = allPosts.filter(p => p.flagged_for_phantombuster).length;
+    const flagged = allPosts.filter(p => p.flagged).length;
     document.getElementById("stats").innerHTML =
       `<span><strong>${total}</strong> posts</span>` +
       `<span><strong>${increased}</strong> with increased likes</span>` +
@@ -307,7 +479,7 @@
     return allPosts.filter(p => {
       if (search && !p.post_text?.toLowerCase().includes(search) && !p.company_name?.toLowerCase().includes(search)) return false;
       if (company && p.company_name !== company) return false;
-      if (flag === "flagged" && !p.flagged_for_phantombuster) return false;
+      if (flag === "flagged" && !p.flagged) return false;
       if (flag === "increased" && !p.likes_increased) return false;
       return true;
     });
@@ -342,11 +514,12 @@
     tbody.innerHTML = posts.map(p => {
       const classes = [
         p.likes_increased ? "likes-increased" : "",
-        p.flagged_for_phantombuster ? "flagged" : "",
+        p.flagged ? "flagged" : "",
       ].filter(Boolean).join(" ");
 
-      const btnClass = p.flagged_for_phantombuster ? "btn-flag active" : "btn-flag";
-      const btnLabel = p.flagged_for_phantombuster ? "Flagged ✓" : "Flag";
+      const btnClass = p.flagged ? "btn-flag active" : "btn-flag";
+      const statusLabel = { queued: " · queued", running: " · running…", done: " · done", error: " · error" };
+      const btnLabel = p.flagged ? "Flagged ✓" + (statusLabel[p.phantom_status] || "") : "Flag";
 
       const date = p.posted_date ? p.posted_date.slice(0, 10) : "—";
       const text = p.post_text || "";
@@ -355,7 +528,7 @@
         <tr class="${classes}" data-id="${p.id}">
           <td>
             <span class="tag tag-company">${esc(p.company_name)}</span>
-            ${p.first_scraped_at === p.last_scraped_at ? '<span class="tag tag-new">New</span>' : ''}
+            ${p.first_seen_at === p.last_updated_at ? '<span class="tag tag-new">New</span>' : ''}
           </td>
           <td>${p.image_url ? `<img class="post-img" src="${esc(p.image_url)}" alt="" onerror="this.style.display='none'" onclick="openLightbox('${esc(p.image_url)}')">` : "—"}</td>
           <td>
@@ -382,7 +555,7 @@
     await fetch(`/api/flag/${postId}`, { method: "POST" });
     const post = allPosts.find(p => p.id === postId);
     if (post) {
-      post.flagged_for_phantombuster = post.flagged_for_phantombuster ? 0 : 1;
+      post.flagged = !post.flagged;
     }
     renderStats();
     renderTable();
@@ -424,6 +597,143 @@
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeLightbox(); });
 
   loadPosts();
+
+  // --- Profiles tab ---
+  let allProfiles = [];
+  const COMPETITOR_COMPANIES = ["poka", "tulip"];
+
+  function isEmployee(p) {
+    return COMPETITOR_COMPANIES.some(k => (p.company || "").toLowerCase().includes(k));
+  }
+
+  function intentScore(p) {
+    const title = (p.title || "").toLowerCase();
+    let seniority = 1;
+    if (/\b(ceo|coo|cto|cfo|president|founder|owner)\b/.test(title)) seniority = 4;
+    else if (/\b(vp|vice president|svp|evp)\b/.test(title)) seniority = 3;
+    else if (/\b(director)\b/.test(title)) seniority = 2.5;
+    else if (/\b(manager|senior|lead|head)\b/.test(title)) seniority = 2;
+    return p.engagement_count * seniority;
+  }
+
+  async function loadProfiles() {
+    const resp = await fetch("/api/profiles");
+    allProfiles = await resp.json();
+    renderProfileStats();
+    renderProfiles();
+  }
+
+  function renderProfileStats() {
+    const total = allProfiles.length;
+    const multiPost = allProfiles.filter(p => p.engagement_count > 1).length;
+    const employees = allProfiles.filter(isEmployee).length;
+    document.getElementById("profile-stats").innerHTML =
+      `<span><strong>${total}</strong> total profiles</span>` +
+      `<span><strong>${multiPost}</strong> engaged with 2+ posts</span>` +
+      `<span><strong>${employees}</strong> employees (hidden by default)</span>`;
+  }
+
+  function renderProfiles() {
+    const search = document.getElementById("profile-search").value.toLowerCase();
+    const company = document.getElementById("profile-company").value;
+    const engagementFilter = document.getElementById("profile-engagement").value;
+    const hideEmployees = document.getElementById("hide-employees").checked;
+
+    let filtered = allProfiles.filter(p => {
+      if (hideEmployees && isEmployee(p)) return false;
+      if (search && !p.full_name?.toLowerCase().includes(search) &&
+          !p.title?.toLowerCase().includes(search) &&
+          !p.company?.toLowerCase().includes(search)) return false;
+      if (company && !p.engaged_posts?.some(e => e.company_name === company)) return false;
+      if (engagementFilter === "multi" && p.engagement_count < 2) return false;
+      return true;
+    });
+
+    filtered.sort((a, b) => intentScore(b) - intentScore(a));
+
+    const tbody = document.getElementById("profile-tbody");
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="4" class="empty">No prospects found.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(p => {
+      const emp = isEmployee(p);
+      const companies = [...new Set((p.engaged_posts || []).map(e => e.company_name).filter(Boolean))];
+      const posts = p.engaged_posts || [];
+      const visiblePosts = posts.slice(0, 3);
+      const hiddenCount = posts.length - 3;
+      const pid = `posts-${p.id}`;
+
+      const postItems = visiblePosts.map(e =>
+        `<li><a href="${esc(e.post_url)}" target="_blank">${esc(e.company_name)}: ${esc(e.post_text)}…</a></li>`
+      ).join("");
+
+      const hiddenItems = hiddenCount > 0 ? posts.slice(3).map(e =>
+        `<li><a href="${esc(e.post_url)}" target="_blank">${esc(e.company_name)}: ${esc(e.post_text)}…</a></li>`
+      ).join("") : "";
+
+      const showMoreBtn = hiddenCount > 0
+        ? `<li><button class="show-more" onclick="toggleMore('${pid}', this)">+ ${hiddenCount} more</button></li>`
+        : "";
+
+      const score = Math.round(intentScore(p));
+      const scoreDots = "●".repeat(Math.min(score, 5)) + "○".repeat(Math.max(0, 5 - Math.min(score, 5)));
+
+      return `
+        <tr class="${emp ? "is-employee" : ""}">
+          <td>
+            <div class="prospect-name">
+              ${p.linkedin_url
+                ? `<a href="${esc(p.linkedin_url)}" target="_blank">${esc(p.full_name || "Unknown")}</a>`
+                : esc(p.full_name || "Unknown")}
+            </div>
+            ${emp ? '<span class="badge badge-employee" style="margin-top:4px;display:inline-block">Employee</span>' : ""}
+            <div style="font-size:0.7rem;color:#7c3aed;margin-top:2px;letter-spacing:1px">${scoreDots}</div>
+          </td>
+          <td>
+            <div class="prospect-title" style="font-weight:500;color:#1a1a2e">${esc(p.title || "—")}</div>
+            <div style="font-size:0.78rem;color:#6b7280;margin-top:2px">${esc(p.company || "")}</div>
+            ${p.location ? `<div style="font-size:0.75rem;color:#9ca3af">${esc(p.location)}</div>` : ""}
+          </td>
+          <td>
+            ${companies.map(c => `<span class="badge badge-company">${esc(c)}</span>`).join(" ")}
+            <span class="badge badge-count" style="margin-top:4px;display:inline-block">${p.engagement_count} post${p.engagement_count !== 1 ? "s" : ""}</span>
+          </td>
+          <td>
+            <ul class="post-list">
+              ${postItems}
+              <span id="${pid}" style="display:none"><ul class="post-list">${hiddenItems}</ul></span>
+              ${showMoreBtn}
+            </ul>
+          </td>
+        </tr>`;
+    }).join("");
+  }
+
+  function toggleMore(id, btn) {
+    const el = document.getElementById(id);
+    if (el.style.display === "none") {
+      el.style.display = "inline";
+      btn.textContent = "Show less";
+    } else {
+      el.style.display = "none";
+      btn.textContent = btn.textContent.replace("Show less", `+ more`);
+    }
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+    document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add("active");
+    document.getElementById(`tab-${tab}`).classList.add("active");
+    if (tab === "profiles" && !allProfiles.length) loadProfiles();
+  }
+
+  ["profile-search", "profile-company", "profile-engagement", "hide-employees"].forEach(id => {
+    document.getElementById(id).addEventListener("input", renderProfiles);
+    document.getElementById(id).addEventListener("change", renderProfiles);
+  });
 </script>
 </body>
 </html>

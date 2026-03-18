@@ -11,7 +11,10 @@ from config import (
     COMPETITOR_URLS,
     ROLLING_WINDOW_DAYS,
 )
-from database import init_db, upsert_post
+from database import upsert_post, auto_flag_top_posts, get_all_posts
+
+# Set to True to skip BrightData and use existing Supabase data (saves credits)
+TEST_MODE = True
 
 TRIGGER_URL = "https://api.brightdata.com/datasets/v3/scrape"
 SNAPSHOT_URL = "https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}"
@@ -47,6 +50,8 @@ def trigger_collection(linkedin_url: str) -> str:
         },
         json={"input": [{"url": linkedin_url}]},
     )
+    if not resp.ok:
+        print(f"  BrightData error: {resp.text}")
     resp.raise_for_status()
     data = resp.json()
     snapshot_id = data.get("snapshot_id")
@@ -71,7 +76,11 @@ def wait_for_snapshot(snapshot_id: str) -> list[dict]:
         if status == "ready":
             dl = requests.get(status_url + "?format=json", headers=HEADERS)
             dl.raise_for_status()
-            all_records = dl.json()
+            try:
+                all_records = dl.json()
+            except Exception:
+                # NDJSON fallback — parse line by line
+                all_records = [json.loads(line) for line in dl.text.strip().splitlines() if line.strip()]
             return [r for r in all_records if isinstance(r, dict) and "error" not in r]
 
         if status == "failed":
@@ -133,14 +142,19 @@ def normalize_post(raw: dict, company_name: str) -> dict:
     }
 
 
-def scrape_competitor(linkedin_url: str):
+def scrape_competitor(linkedin_url: str, retries: int = 2):
     company_name = company_name_from_url(linkedin_url)
     print(f"Scraping {company_name} ({linkedin_url})...")
 
-    snapshot_id = trigger_collection(linkedin_url)
-    print(f"  Snapshot triggered: {snapshot_id}")
-
-    raw_posts = wait_for_snapshot(snapshot_id)
+    raw_posts = []
+    for attempt in range(1, retries + 1):
+        snapshot_id = trigger_collection(linkedin_url)
+        print(f"  Snapshot triggered: {snapshot_id}")
+        raw_posts = wait_for_snapshot(snapshot_id)
+        if raw_posts:
+            break
+        if attempt < retries:
+            print(f"  Got 0 posts, retrying (attempt {attempt + 1}/{retries})...")
     raw_posts = raw_posts[:5]
     print(f"  Retrieved {len(raw_posts)} posts")
 
@@ -156,14 +170,36 @@ def scrape_competitor(linkedin_url: str):
 
     print(f"  Saved {saved} posts within {ROLLING_WINDOW_DAYS}-day window")
 
+    # Auto-flag top 2 posts with net new likes for PhantomBuster
+    flagged = auto_flag_top_posts(company_name, top_n=2)
+    if flagged:
+        print(f"  Auto-flagged {flagged} post(s) for PhantomBuster")
+    else:
+        print(f"  No posts with net new likes — nothing auto-flagged")
+
 
 def main():
-    init_db()
-    for url in COMPETITOR_URLS:
-        try:
-            scrape_competitor(url)
-        except Exception as e:
-            print(f"Error scraping {url}: {e}")
+    if TEST_MODE:
+        print("TEST MODE — skipping BrightData, using existing posts from Supabase")
+        posts = get_all_posts()
+        companies = set(p["company_name"] for p in posts)
+        for company in companies:
+            flagged = auto_flag_top_posts(company, top_n=2)
+            if flagged:
+                print(f"  [{company}] Auto-flagged {flagged} post(s)")
+            else:
+                print(f"  [{company}] No posts with net new likes — nothing auto-flagged")
+    else:
+        for url in COMPETITOR_URLS:
+            try:
+                scrape_competitor(url)
+            except Exception as e:
+                print(f"Error scraping {url}: {e}")
+
+    # Run PhantomBuster on any newly queued posts
+    print("\nRunning PhantomBuster on queued posts...")
+    import phantom_runner
+    phantom_runner.run()
 
 
 if __name__ == "__main__":
