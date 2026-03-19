@@ -129,6 +129,11 @@
       text-overflow: ellipsis;
     }
 
+    .hidden { display: none !important; }
+
+    .badge-manual { background: #ede9fe; color: #6d28d9; }
+    .badge-pain-point { background: #fef3c7; color: #92400e; font-style: italic; }
+
     .show-more {
       background: none;
       border: none;
@@ -420,9 +425,25 @@
 </div>
 
 <div class="tab-content active" id="tab-posts">
-<div class="legend">
-  <div class="legend-item"><div class="legend-swatch swatch-likes"></div> Likes increased</div>
-  <div class="legend-item"><div class="legend-swatch swatch-flagged"></div> Flagged for PhantomBuster</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch swatch-likes"></div> Likes increased</div>
+    <div class="legend-item"><div class="legend-swatch swatch-flagged"></div> Flagged for PhantomBuster</div>
+  </div>
+  <button onclick="document.getElementById('add-post-form').classList.toggle('hidden')" style="background:#4f46e5;color:#fff;border:none;padding:7px 14px;border-radius:6px;font-size:0.82rem;cursor:pointer;font-weight:500">+ Add Post URL</button>
+</div>
+
+<div id="add-post-form" class="hidden" style="background:#f8faff;border:1px solid #e0e7ff;border-radius:8px;padding:16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+  <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:260px">
+    <label style="font-size:0.75rem;font-weight:600;color:#4b5563">LinkedIn Post URL</label>
+    <input id="manual-post-url" type="text" placeholder="https://www.linkedin.com/posts/..." style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;width:100%">
+  </div>
+  <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px">
+    <label style="font-size:0.75rem;font-weight:600;color:#4b5563">Pain Point Label</label>
+    <input id="manual-post-label" type="text" placeholder="e.g. Paper processes" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;width:100%">
+  </div>
+  <button onclick="submitManualPost()" style="background:#4f46e5;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:0.82rem;cursor:pointer;font-weight:500;white-space:nowrap">Add & Queue</button>
+  <span id="manual-post-status" style="font-size:0.8rem;color:#059669;display:none">✓ Added! Will scrape on next pipeline run.</span>
 </div>
 
 <div class="stats-bar" id="stats"></div>
@@ -579,7 +600,10 @@
       return `
         <tr class="${classes}" data-id="${p.id}">
           <td>
-            <span class="tag tag-company">${esc(p.company_name)}</span>
+            ${p.source === 'manual'
+              ? `<span class="badge badge-manual">Manual</span>`
+              : `<span class="tag tag-company">${esc(p.company_name)}</span>`}
+            ${p.pain_point ? `<br><span class="badge badge-pain-point" style="margin-top:4px;display:inline-block">${esc(p.pain_point)}</span>` : ''}
             ${p.first_seen_at === p.last_updated_at ? '<span class="tag tag-new">New</span>' : ''}
           </td>
           <td>${p.image_url ? `<img class="post-img" src="${esc(p.image_url)}" alt="" onerror="this.style.display='none'" onclick="openLightbox('${esc(p.image_url)}')">` : "—"}</td>
@@ -787,6 +811,27 @@
     document.getElementById(id).addEventListener("input", renderProfiles);
     document.getElementById(id).addEventListener("change", renderProfiles);
   });
+
+  async function submitManualPost() {
+    const url = document.getElementById("manual-post-url").value.trim();
+    const label = document.getElementById("manual-post-label").value.trim();
+    if (!url) { alert("Please enter a LinkedIn post URL"); return; }
+    const status = document.getElementById("manual-post-status");
+    status.style.display = "none";
+    const resp = await fetch("/api/posts/manual", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, pain_point: label }),
+    });
+    if (resp.ok) {
+      document.getElementById("manual-post-url").value = "";
+      document.getElementById("manual-post-label").value = "";
+      status.style.display = "inline";
+      await loadPosts();
+    } else {
+      alert("Failed to add post. Check the URL and try again.");
+    }
+  }
 </script>
 </body>
 </html>

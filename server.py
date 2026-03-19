@@ -1,6 +1,6 @@
 import os
-from flask import Flask, jsonify, send_from_directory
-from database import get_all_posts, flag_post, get_profiles
+from flask import Flask, jsonify, send_from_directory, request
+from database import get_all_posts, flag_post, get_profiles, add_manual_post
 
 app = Flask(__name__, static_folder="dashboard")
 
@@ -20,6 +20,17 @@ def api_posts():
 def api_profiles():
     profiles = get_profiles()
     return jsonify(profiles)
+
+
+@app.route("/api/posts/manual", methods=["POST"])
+def api_add_manual_post():
+    data = request.get_json()
+    url = (data.get("url") or "").strip()
+    pain_point = (data.get("pain_point") or "").strip()
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    post_id = add_manual_post(url, pain_point)
+    return jsonify({"success": True, "post_id": post_id})
 
 
 @app.route("/api/flag/<int:post_id>", methods=["POST"])

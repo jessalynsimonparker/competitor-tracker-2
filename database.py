@@ -117,6 +117,36 @@ def auto_flag_top_posts(company_name: str, top_n: int = 2):
     return flagged
 
 
+def add_manual_post(post_url: str, pain_point: str) -> int:
+    now = datetime.now(timezone.utc).isoformat()
+    existing = supabase.table("posts").select("id").eq("post_url", post_url).execute()
+    if existing.data:
+        post_id = existing.data[0]["id"]
+        supabase.table("posts").update({
+            "flagged": True,
+            "phantom_status": "queued",
+            "pain_point": pain_point,
+            "source": "manual",
+        }).eq("id", post_id).execute()
+        return post_id
+    result = supabase.table("posts").insert({
+        "post_url": post_url,
+        "company_name": "Manual",
+        "post_text": "",
+        "pain_point": pain_point,
+        "source": "manual",
+        "flagged": True,
+        "phantom_status": "queued",
+        "likes": 0,
+        "comments": 0,
+        "prev_likes": 0,
+        "likes_increased": False,
+        "first_seen_at": now,
+        "last_updated_at": now,
+    }).execute()
+    return result.data[0]["id"]
+
+
 def get_queued_posts() -> list[dict]:
     result = supabase.table("posts").select("id, post_url, company_name").eq("phantom_status", "queued").execute()
     return result.data
