@@ -438,9 +438,17 @@
     <label style="font-size:0.75rem;font-weight:600;color:#4b5563">LinkedIn Post URL</label>
     <input id="manual-post-url" type="text" placeholder="https://www.linkedin.com/posts/..." style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;width:100%">
   </div>
-  <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px">
+  <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px">
     <label style="font-size:0.75rem;font-weight:600;color:#4b5563">Pain Point Label</label>
     <input id="manual-post-label" type="text" placeholder="e.g. Paper processes" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;width:100%">
+  </div>
+  <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px">
+    <label style="font-size:0.75rem;font-weight:600;color:#4b5563">Poster Company</label>
+    <input id="manual-poster-company" type="text" placeholder="e.g. Lean Advisors Inc" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;width:100%">
+  </div>
+  <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px">
+    <label style="font-size:0.75rem;font-weight:600;color:#4b5563">Poster Title</label>
+    <input id="manual-poster-title" type="text" placeholder="e.g. Lean Transformation Lead" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;width:100%">
   </div>
   <button onclick="submitManualPost()" style="background:#4f46e5;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:0.82rem;cursor:pointer;font-weight:500;white-space:nowrap">Add & Queue</button>
   <span id="manual-post-status" style="font-size:0.8rem;color:#059669;display:none">✓ Added! Will scrape on next pipeline run.</span>
@@ -607,6 +615,7 @@
               ? `<span class="badge badge-manual">Manual</span>`
               : `<span class="tag tag-company">${esc(p.company_name)}</span>`}
             ${p.pain_point ? `<br><span class="badge badge-pain-point" style="margin-top:4px;display:inline-block">${esc(p.pain_point)}</span>` : ''}
+            ${p.poster_name ? `<br><span style="font-size:0.72rem;color:#6b7280;margin-top:3px;display:inline-block">by ${esc(p.poster_name)}${p.poster_title ? ` · ${esc(p.poster_title)}` : ''}${p.poster_company ? ` @ ${esc(p.poster_company)}` : ''}</span>` : ''}
             ${p.first_seen_at === p.last_updated_at ? '<span class="tag tag-new">New</span>' : ''}
           </td>
           <td>${p.image_url ? `<img class="post-img" src="${esc(p.image_url)}" alt="" onerror="this.style.display='none'" onclick="openLightbox('${esc(p.image_url)}')">` : "—"}</td>
@@ -841,11 +850,18 @@
     const resp = await fetch("/api/posts/manual", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, pain_point: label }),
+      body: JSON.stringify({
+        url,
+        pain_point: label,
+        poster_company: document.getElementById("manual-poster-company").value.trim(),
+        poster_title: document.getElementById("manual-poster-title").value.trim(),
+      }),
     });
     if (resp.ok) {
       document.getElementById("manual-post-url").value = "";
       document.getElementById("manual-post-label").value = "";
+      document.getElementById("manual-poster-company").value = "";
+      document.getElementById("manual-poster-title").value = "";
       status.style.display = "inline";
       await loadPosts();
     } else {

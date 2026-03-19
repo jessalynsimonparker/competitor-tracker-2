@@ -116,7 +116,7 @@ def fetch_og_image(post_url: str) -> str:
 
 
 def fetch_og_metadata(post_url: str) -> dict:
-    meta = {"image": "", "text": "", "likes": 0}
+    meta = {"image": "", "text": "", "likes": 0, "poster_name": ""}
     try:
         resp = requests.get(post_url, headers={
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
@@ -135,6 +135,15 @@ def fetch_og_metadata(post_url: str) -> dict:
         likes_match = re.search(r'"numLikes"\s*:\s*(\d+)', html)
         if likes_match:
             meta["likes"] = int(likes_match.group(1))
+
+        # Extract poster name from og:title e.g. "Dan Davis on LinkedIn: ..."
+        title_match = re.search(r'<meta property="og:title" content="([^"]+)"', html)
+        if title_match:
+            import html as html_lib
+            og_title = html_lib.unescape(title_match.group(1))
+            name_match = re.match(r"^(.+?)\s+on LinkedIn", og_title)
+            if name_match:
+                meta["poster_name"] = name_match.group(1)
     except Exception:
         pass
     return meta

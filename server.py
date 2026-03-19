@@ -27,9 +27,11 @@ def api_add_manual_post():
     data = request.get_json()
     url = (data.get("url") or "").strip()
     pain_point = (data.get("pain_point") or "").strip()
+    poster_company = (data.get("poster_company") or "").strip()
+    poster_title = (data.get("poster_title") or "").strip()
     if not url:
         return jsonify({"error": "url is required"}), 400
-    post_id = add_manual_post(url, pain_point)
+    post_id = add_manual_post(url, pain_point, poster_company, poster_title)
     return jsonify({"success": True, "post_id": post_id})
 
 

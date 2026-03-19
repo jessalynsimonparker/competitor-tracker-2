@@ -117,10 +117,15 @@ def auto_flag_top_posts(company_name: str, top_n: int = 2):
     return flagged
 
 
-def add_manual_post(post_url: str, pain_point: str) -> int:
+def add_manual_post(post_url: str, pain_point: str, poster_company: str = "", poster_title: str = "") -> int:
     from scraper import fetch_og_metadata
     meta = fetch_og_metadata(post_url)
     now = datetime.now(timezone.utc).isoformat()
+    poster_fields = {
+        "poster_name": meta.get("poster_name") or "",
+        "poster_company": poster_company,
+        "poster_title": poster_title,
+    }
     existing = supabase.table("posts").select("id").eq("post_url", post_url).execute()
     if existing.data:
         post_id = existing.data[0]["id"]
@@ -133,6 +138,7 @@ def add_manual_post(post_url: str, pain_point: str) -> int:
             "image_url": meta["image"] or "",
             "likes": meta["likes"] or 0,
             "last_updated_at": now,
+            **poster_fields,
         }).eq("id", post_id).execute()
         return post_id
     result = supabase.table("posts").insert({
@@ -150,6 +156,7 @@ def add_manual_post(post_url: str, pain_point: str) -> int:
         "likes_increased": False,
         "first_seen_at": now,
         "last_updated_at": now,
+        **poster_fields,
     }).execute()
     return result.data[0]["id"]
 
