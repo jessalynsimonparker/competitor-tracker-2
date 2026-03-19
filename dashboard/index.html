@@ -488,6 +488,9 @@
       <option value="Poka Inc ">Poka only</option>
       <option value="Tulip Interfaces">Tulip only</option>
     </select>
+    <select id="profile-post">
+      <option value="">All posts</option>
+    </select>
     <select id="profile-engagement">
       <option value="">All prospects</option>
       <option value="multi">2+ posts engaged</option>
@@ -695,6 +698,21 @@
   async function loadProfiles() {
     const resp = await fetch("/api/profiles");
     allProfiles = await resp.json();
+
+    // Populate post dropdown from all engaged posts
+    const postMap = {};
+    allProfiles.forEach(p => (p.engaged_posts || []).forEach(e => {
+      if (e.post_id && !postMap[e.post_id]) {
+        const label = (e.post_text || "").slice(0, 60) || e.post_url;
+        postMap[e.post_id] = label;
+      }
+    }));
+    const sel = document.getElementById("profile-post");
+    sel.innerHTML = '<option value="">All posts</option>' +
+      Object.entries(postMap).map(([id, label]) =>
+        `<option value="${id}">${label}…</option>`
+      ).join("");
+
     renderProfileStats();
     renderProfiles();
   }
@@ -712,6 +730,7 @@
   function renderProfiles() {
     const search = document.getElementById("profile-search").value.toLowerCase();
     const company = document.getElementById("profile-company").value;
+    const postFilter = document.getElementById("profile-post").value;
     const engagementFilter = document.getElementById("profile-engagement").value;
     const hideEmployees = document.getElementById("hide-employees").classList.contains("active");
 
@@ -720,6 +739,7 @@
       if (search && !p.full_name?.toLowerCase().includes(search) &&
           !p.title?.toLowerCase().includes(search) &&
           !p.company?.toLowerCase().includes(search)) return false;
+      if (postFilter && !p.engaged_posts?.some(e => String(e.post_id) === postFilter)) return false;
       if (company && !p.engaged_posts?.some(e => e.company_name === company)) return false;
       if (engagementFilter === "multi" && p.engagement_count < 2) return false;
       return true;
@@ -807,7 +827,7 @@
     if (tab === "profiles" && !allProfiles.length) loadProfiles();
   }
 
-  ["profile-search", "profile-company", "profile-engagement"].forEach(id => {
+  ["profile-search", "profile-company", "profile-post", "profile-engagement"].forEach(id => {
     document.getElementById(id).addEventListener("input", renderProfiles);
     document.getElementById(id).addEventListener("change", renderProfiles);
   });
