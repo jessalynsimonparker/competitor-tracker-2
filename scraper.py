@@ -112,19 +112,32 @@ def is_within_window(posted_date_str: str) -> bool:
 
 
 def fetch_og_image(post_url: str) -> str:
+    return fetch_og_metadata(post_url).get("image", "")
+
+
+def fetch_og_metadata(post_url: str) -> dict:
+    meta = {"image": "", "text": "", "likes": 0}
     try:
         resp = requests.get(post_url, headers={
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
         }, timeout=8)
-        match = re.search(r'<meta property="og:image" content="([^"]+)"', resp.text)
-        if match:
-            url = match.group(1)
-            # skip generic LinkedIn icons
-            if "static.licdn.com" not in url:
-                return url
+        html = resp.text
+
+        img_match = re.search(r'<meta property="og:image" content="([^"]+)"', html)
+        if img_match and "static.licdn.com" not in img_match.group(1):
+            meta["image"] = img_match.group(1)
+
+        desc_match = re.search(r'<meta property="og:description" content="([^"]+)"', html)
+        if desc_match:
+            import html as html_lib
+            meta["text"] = html_lib.unescape(desc_match.group(1))
+
+        likes_match = re.search(r'"numLikes"\s*:\s*(\d+)', html)
+        if likes_match:
+            meta["likes"] = int(likes_match.group(1))
     except Exception:
         pass
-    return ""
+    return meta
 
 
 def normalize_post(raw: dict, company_name: str) -> dict:

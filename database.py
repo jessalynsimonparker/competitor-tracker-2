@@ -118,6 +118,8 @@ def auto_flag_top_posts(company_name: str, top_n: int = 2):
 
 
 def add_manual_post(post_url: str, pain_point: str) -> int:
+    from scraper import fetch_og_metadata
+    meta = fetch_og_metadata(post_url)
     now = datetime.now(timezone.utc).isoformat()
     existing = supabase.table("posts").select("id").eq("post_url", post_url).execute()
     if existing.data:
@@ -127,17 +129,22 @@ def add_manual_post(post_url: str, pain_point: str) -> int:
             "phantom_status": "queued",
             "pain_point": pain_point,
             "source": "manual",
+            "post_text": meta["text"] or "",
+            "image_url": meta["image"] or "",
+            "likes": meta["likes"] or 0,
+            "last_updated_at": now,
         }).eq("id", post_id).execute()
         return post_id
     result = supabase.table("posts").insert({
         "post_url": post_url,
         "company_name": "Manual",
-        "post_text": "",
+        "post_text": meta["text"] or "",
+        "image_url": meta["image"] or "",
         "pain_point": pain_point,
         "source": "manual",
         "flagged": True,
         "phantom_status": "queued",
-        "likes": 0,
+        "likes": meta["likes"] or 0,
         "comments": 0,
         "prev_likes": 0,
         "likes_increased": False,
