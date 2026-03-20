@@ -295,6 +295,14 @@
 
     tr.likes-increased { background: #fff9e6; }
     tr.flagged { background: #ede9fe; }
+
+    tbody tr[onclick]:hover { background: #f0f4ff !important; }
+    tbody tr[onclick]:hover td:first-child::after {
+      content: " ↗";
+      font-size: 0.7rem;
+      color: #4f46e5;
+      opacity: 0.7;
+    }
     tr.likes-increased.flagged { background: #f3eeff; }
 
     .post-text {
@@ -453,14 +461,14 @@
       margin: 16px 0 10px; border-top: 1px solid #f3f4f6; padding-top: 12px;
     }
     .liker-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 8px 0; border-bottom: 1px solid #f9fafb;
+      padding: 10px 0; border-bottom: 1px solid #f3f4f6;
     }
     .liker-row:last-child { border-bottom: none; }
-    .liker-name { font-size: 0.83rem; font-weight: 500; color: #1a1a2e; }
+    .liker-name { font-size: 0.85rem; font-weight: 600; color: #1a1a2e; margin-bottom: 2px; }
     .liker-name a { color: #1a1a2e; text-decoration: none; }
-    .liker-name a:hover { text-decoration: underline; }
-    .liker-sub { font-size: 0.75rem; color: #6b7280; margin-top: 1px; }
+    .liker-name a:hover { color: #4f46e5; text-decoration: underline; }
+    .liker-title { font-size: 0.78rem; color: #374151; margin-bottom: 1px; }
+    .liker-company { font-size: 0.75rem; color: #6b7280; }
 
     .stats-bar {
       display: flex;
@@ -950,12 +958,11 @@
     }
     likersEl.innerHTML = likers.map(l => `
       <div class="liker-row">
-        <div>
-          <div class="liker-name">
-            ${l.linkedin_url ? `<a href="${esc(l.linkedin_url)}" target="_blank">${esc(l.full_name || "Unknown")}</a>` : esc(l.full_name || "Unknown")}
-          </div>
-          <div class="liker-sub">${esc(l.title || "")}${l.title && l.company ? " · " : ""}${esc(l.company || "")}</div>
+        <div class="liker-name">
+          ${l.linkedin_url ? `<a href="${esc(l.linkedin_url)}" target="_blank">${esc(l.full_name || "Unknown")}</a>` : esc(l.full_name || "Unknown")}
         </div>
+        ${l.title ? `<div class="liker-title">${esc(l.title)}</div>` : ""}
+        ${l.company ? `<div class="liker-company">${esc(l.company)}</div>` : ""}
       </div>
     `).join("");
   }
