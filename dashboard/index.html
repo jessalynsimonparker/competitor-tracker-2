@@ -972,8 +972,18 @@
     document.getElementById("post-panel").classList.remove("open");
   }
 
+  function cleanLinkedInUrl(url) {
+    try {
+      const u = new URL(url.trim());
+      // Keep only the path, strip all query params and fragments
+      return `https://www.linkedin.com${u.pathname.replace(/\/$/, "")}`;
+    } catch {
+      return url.trim();
+    }
+  }
+
   async function submitManualPost() {
-    const url = document.getElementById("manual-post-url").value.trim();
+    const url = cleanLinkedInUrl(document.getElementById("manual-post-url").value);
     const label = document.getElementById("manual-post-label").value.trim();
     if (!url) { alert("Please enter a LinkedIn post URL"); return; }
     const status = document.getElementById("manual-post-status");
