@@ -20,6 +20,8 @@ def push_to_clay(profiles: list[dict]) -> int:
             "linkedin_url": p["linkedin_url"],
             "full_name": p.get("full_name") or "",
             "headline": p.get("title") or "",
+            "source_post_url": p.get("source_post_url") or "",
+            "source_company": p.get("source_company") or "",
         }
         resp = requests.post(CLAY_WEBHOOK_URL, json=payload)
         if resp.ok:
@@ -30,13 +32,26 @@ def push_to_clay(profiles: list[dict]) -> int:
 
 
 def run():
-    # Only push profiles that haven't been enriched yet
-    result = supabase.table("profiles").select("id, linkedin_url, full_name, title").eq("enriched", False).execute()
+    # Get unenriched profiles with their most recent post engagement for context
+    result = supabase.table("profiles").select(
+        "id, linkedin_url, full_name, title, engagement(post_id, posts(post_url, company_name, pain_point))"
+    ).eq("enriched", False).execute()
     profiles = result.data
 
     if not profiles:
         print("No unenriched profiles to push.")
         return
+
+    # Attach most recent post context to each profile
+    for p in profiles:
+        engagements = p.pop("engagement", []) or []
+        if engagements:
+            post = (engagements[-1].get("posts") or {})
+            p["source_post_url"] = post.get("post_url") or ""
+            p["source_company"] = post.get("pain_point") or post.get("company_name") or ""
+        else:
+            p["source_post_url"] = ""
+            p["source_company"] = ""
 
     print(f"Pushing {len(profiles)} unenriched profiles to Clay...")
     pushed = push_to_clay(profiles)
