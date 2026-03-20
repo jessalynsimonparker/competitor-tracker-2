@@ -117,14 +117,27 @@ def auto_flag_top_posts(company_name: str, top_n: int = 2):
     return flagged
 
 
+def _extract_poster_linkedin_url(post_url: str) -> str:
+    """Extract linkedin.com/in/[slug] from a LinkedIn post URL."""
+    import re
+    match = re.search(r'/posts/([^_?/]+)', post_url)
+    if match:
+        slug = match.group(1)
+        return f"https://www.linkedin.com/in/{slug}/"
+    return ""
+
+
 def add_manual_post(post_url: str, pain_point: str, poster_company: str = "", poster_title: str = "") -> int:
     from scraper import fetch_og_metadata
+    from enrich_profiles import push_poster_to_clay
     meta = fetch_og_metadata(post_url)
+    poster_linkedin_url = _extract_poster_linkedin_url(post_url)
     now = datetime.now(timezone.utc).isoformat()
     poster_fields = {
         "poster_name": meta.get("poster_name") or "",
         "poster_company": poster_company,
         "poster_title": poster_title,
+        "poster_linkedin_url": poster_linkedin_url,
     }
     existing = supabase.table("posts").select("id").eq("post_url", post_url).execute()
     if existing.data:
@@ -140,24 +153,31 @@ def add_manual_post(post_url: str, pain_point: str, poster_company: str = "", po
             "last_updated_at": now,
             **poster_fields,
         }).eq("id", post_id).execute()
-        return post_id
-    result = supabase.table("posts").insert({
-        "post_url": post_url,
-        "company_name": "Manual",
-        "post_text": meta["text"] or "",
-        "image_url": meta["image"] or "",
-        "pain_point": pain_point,
-        "source": "manual",
-        "flagged": True,
-        "phantom_status": "queued",
-        "likes": meta["likes"] or 0,
-        "comments": 0,
-        "prev_likes": 0,
-        "likes_increased": False,
-        "first_seen_at": now,
-        "last_updated_at": now,
-        **poster_fields,
-    }).execute()
+    else:
+        supabase.table("posts").insert({
+            "post_url": post_url,
+            "company_name": "Manual",
+            "post_text": meta["text"] or "",
+            "image_url": meta["image"] or "",
+            "pain_point": pain_point,
+            "source": "manual",
+            "flagged": True,
+            "phantom_status": "queued",
+            "likes": meta["likes"] or 0,
+            "comments": 0,
+            "prev_likes": 0,
+            "likes_increased": False,
+            "first_seen_at": now,
+            "last_updated_at": now,
+            **poster_fields,
+        }).execute()
+
+    # Push poster to Clay for enrichment if we have a LinkedIn URL
+    if poster_linkedin_url:
+        push_poster_to_clay(post_url, poster_linkedin_url)
+        print(f"  Pushed poster {poster_linkedin_url} to Clay for enrichment")
+
+    result = supabase.table("posts").select("id").eq("post_url", post_url).execute()
     return result.data[0]["id"]
 
 
