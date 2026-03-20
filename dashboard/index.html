@@ -398,6 +398,70 @@
 
     .empty { text-align: center; padding: 48px; color: #9ca3af; }
 
+    .post-panel-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 200;
+    }
+    .post-panel-overlay.open { display: block; }
+
+    .post-panel {
+      position: fixed;
+      top: 0; right: -520px;
+      width: 500px;
+      height: 100vh;
+      background: #fff;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+      z-index: 201;
+      display: flex;
+      flex-direction: column;
+      transition: right 0.25s ease;
+      overflow: hidden;
+    }
+    .post-panel.open { right: 0; }
+
+    .post-panel-header {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .post-panel-header h3 { font-size: 0.9rem; font-weight: 600; color: #1a1a2e; margin: 0; }
+    .post-panel-close {
+      background: none; border: none; font-size: 1.4rem; color: #9ca3af;
+      cursor: pointer; line-height: 1; padding: 0; flex-shrink: 0;
+    }
+    .post-panel-close:hover { color: #374151; }
+
+    .post-panel-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+    .post-panel-meta {
+      font-size: 0.78rem; color: #6b7280; margin-bottom: 12px;
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    }
+    .post-panel-text {
+      font-size: 0.85rem; color: #374151; line-height: 1.6;
+      margin-bottom: 16px; white-space: pre-wrap;
+    }
+    .post-panel-divider {
+      font-size: 0.75rem; font-weight: 600; color: #9ca3af;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin: 16px 0 10px; border-top: 1px solid #f3f4f6; padding-top: 12px;
+    }
+    .liker-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid #f9fafb;
+    }
+    .liker-row:last-child { border-bottom: none; }
+    .liker-name { font-size: 0.83rem; font-weight: 500; color: #1a1a2e; }
+    .liker-name a { color: #1a1a2e; text-decoration: none; }
+    .liker-name a:hover { text-decoration: underline; }
+    .liker-sub { font-size: 0.75rem; color: #6b7280; margin-top: 1px; }
+
     .stats-bar {
       display: flex;
       gap: 20px;
@@ -410,6 +474,17 @@
   </style>
 </head>
 <body>
+
+<div class="post-panel-overlay" id="post-panel-overlay" onclick="closePostPanel()"></div>
+<div class="post-panel" id="post-panel">
+  <div class="post-panel-header">
+    <h3 id="post-panel-title">Post Details</h3>
+    <button class="post-panel-close" onclick="closePostPanel()">&times;</button>
+  </div>
+  <div class="post-panel-body" id="post-panel-body">
+    <div class="empty">Loading...</div>
+  </div>
+</div>
 
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
   <span class="lightbox-close">&times;</span>
@@ -609,7 +684,7 @@
       const text = p.post_text || "";
 
       return `
-        <tr class="${classes}" data-id="${p.id}">
+        <tr class="${classes}" data-id="${p.id}" onclick="openPostPanel(${p.id})" style="cursor:pointer">
           <td>
             ${p.source === 'manual'
               ? `<span class="badge badge-manual">Manual</span>`
@@ -632,7 +707,7 @@
             ${p.post_url ? `<a class="linkedin-link" href="${esc(p.post_url)}" target="_blank" rel="noopener">View →</a>` : "—"}
           </td>
           <td>
-            <button class="${btnClass}" onclick="toggleFlag(${p.id}, this)">${btnLabel}</button>
+            <button class="${btnClass}" onclick="event.stopPropagation(); toggleFlag(${p.id}, this)">${btnLabel}</button>
           </td>
         </tr>`;
     }).join("");
@@ -840,6 +915,55 @@
     document.getElementById(id).addEventListener("input", renderProfiles);
     document.getElementById(id).addEventListener("change", renderProfiles);
   });
+
+  async function openPostPanel(postId) {
+    const post = allPosts.find(p => p.id === postId);
+    if (!post) return;
+
+    document.getElementById("post-panel-overlay").classList.add("open");
+    document.getElementById("post-panel").classList.add("open");
+
+    const title = post.source === "manual"
+      ? (post.pain_point || "Manual Post")
+      : post.company_name;
+    document.getElementById("post-panel-title").textContent = title;
+
+    const body = document.getElementById("post-panel-body");
+    body.innerHTML = `
+      <div class="post-panel-meta">
+        ${post.poster_name ? `<span>by <strong>${esc(post.poster_name)}</strong>${post.poster_title ? ` · ${esc(post.poster_title)}` : ""}${post.poster_company ? ` @ ${esc(post.poster_company)}` : ""}</span>` : ""}
+        ${post.posted_date ? `<span>${esc(post.posted_date.slice(0,10))}</span>` : ""}
+        ${post.likes ? `<span>${post.likes} likes</span>` : ""}
+        ${post.post_url ? `<a href="${esc(post.post_url)}" target="_blank" style="color:#4f46e5;text-decoration:none;font-size:0.75rem">View on LinkedIn →</a>` : ""}
+      </div>
+      <div class="post-panel-text">${esc(post.post_text || "No post text available")}</div>
+      <div class="post-panel-divider">People who liked this post</div>
+      <div id="post-panel-likers"><div class="empty">Loading likers...</div></div>
+    `;
+
+    const resp = await fetch(`/api/posts/${postId}/likers`);
+    const likers = await resp.json();
+    const likersEl = document.getElementById("post-panel-likers");
+    if (!likers.length) {
+      likersEl.innerHTML = `<div class="empty" style="padding:24px">No likers scraped yet — flag this post and run PhantomBuster.</div>`;
+      return;
+    }
+    likersEl.innerHTML = likers.map(l => `
+      <div class="liker-row">
+        <div>
+          <div class="liker-name">
+            ${l.linkedin_url ? `<a href="${esc(l.linkedin_url)}" target="_blank">${esc(l.full_name || "Unknown")}</a>` : esc(l.full_name || "Unknown")}
+          </div>
+          <div class="liker-sub">${esc(l.title || "")}${l.title && l.company ? " · " : ""}${esc(l.company || "")}</div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function closePostPanel() {
+    document.getElementById("post-panel-overlay").classList.remove("open");
+    document.getElementById("post-panel").classList.remove("open");
+  }
 
   async function submitManualPost() {
     const url = document.getElementById("manual-post-url").value.trim();

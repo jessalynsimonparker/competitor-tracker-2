@@ -35,6 +35,16 @@ def api_add_manual_post():
     return jsonify({"success": True, "post_id": post_id})
 
 
+@app.route("/api/posts/<int:post_id>/likers")
+def api_post_likers(post_id):
+    from database import supabase
+    result = supabase.table("engagement").select(
+        "profiles(id, linkedin_url, full_name, title, company)"
+    ).eq("post_id", post_id).eq("engagement_type", "like").execute()
+    likers = [e["profiles"] for e in result.data if e.get("profiles")]
+    return jsonify(likers)
+
+
 @app.route("/api/flag/<int:post_id>", methods=["POST"])
 def api_flag(post_id):
     new_val = flag_post(post_id)
