@@ -12,7 +12,7 @@ import json
 import time
 import requests
 from config import PHANTOMBUSTER_API_KEY, PHANTOMBUSTER_LIKERS_AGENT_ID
-from database import get_queued_posts, set_phantom_status, upsert_profile, upsert_engagement
+from database import get_queued_posts, set_phantom_status, upsert_profile, upsert_engagement, update_post_like_count_from_engagement, supabase
 
 AGENT_ID = PHANTOMBUSTER_LIKERS_AGENT_ID
 HEADERS = {"X-Phantombuster-Key": PHANTOMBUSTER_API_KEY}
@@ -155,6 +155,15 @@ def run():
             print(f"  Got {len(engagers)} likers from PhantomBuster")
             saved, skipped = save_engagers(post_id, engagers)
             print(f"  Saved {saved} profiles ({skipped} skipped — no LinkedIn URL)")
+
+            # For manual posts, the engagement-row count is the only source of
+            # truth for likes (LinkedIn's public HTML hides engagement counts).
+            # Sync posts.likes back from the engagement table.
+            post_row = supabase.table("posts").select("source").eq("id", post_id).execute().data
+            if post_row and post_row[0].get("source") == "manual":
+                new_count = update_post_like_count_from_engagement(post_id)
+                print(f"  Manual post — synced likes={new_count} from engagement count")
+
             set_phantom_status(post_id, "done")
         except Exception as e:
             print(f"  Error: {e}")

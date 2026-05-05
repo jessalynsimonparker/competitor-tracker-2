@@ -127,11 +127,50 @@ def _extract_poster_linkedin_url(post_url: str) -> str:
     return ""
 
 
+def _posted_date_from_url(post_url: str) -> str:
+    """Decode posted date from a LinkedIn activity ID embedded in the post URL.
+
+    LinkedIn activity IDs are snowflake-style: top 41 bits = milliseconds since
+    the unix epoch. So we can recover the post's publish date even when the
+    public HTML doesn't expose it (which is the case for un-authenticated fetches).
+
+    Returns ISO-8601 string like '2026-02-19T03:14:22+00:00', or '' if no
+    activity ID is found in the URL.
+    """
+    import re
+    m = re.search(r'activity[:-](\d+)', post_url)
+    if not m:
+        return ""
+    activity_id = int(m.group(1))
+    timestamp_ms = activity_id >> 22
+    return datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).isoformat()
+
+
+def update_post_like_count_from_engagement(post_id: int) -> int:
+    """Set posts.likes for a post equal to its engagement-row count. Returns the new count.
+
+    For manual posts we can't read likes from public HTML, so PhantomBuster's
+    scraped likers are the only source of truth. Call this after each phantom
+    run finishes a post.
+    """
+    result = (
+        supabase.table("engagement")
+        .select("id", count="exact")
+        .eq("post_id", post_id)
+        .eq("engagement_type", "like")
+        .execute()
+    )
+    count = result.count or 0
+    supabase.table("posts").update({"likes": count}).eq("id", post_id).execute()
+    return count
+
+
 def add_manual_post(post_url: str, pain_point: str, poster_company: str = "", poster_title: str = "") -> int:
     from scraper import fetch_og_metadata
     from enrich_profiles import push_poster_to_clay
     meta = fetch_og_metadata(post_url)
     poster_linkedin_url = _extract_poster_linkedin_url(post_url)
+    posted_date = _posted_date_from_url(post_url)
     now = datetime.now(timezone.utc).isoformat()
     poster_fields = {
         "poster_name": meta.get("poster_name") or "",
@@ -150,6 +189,7 @@ def add_manual_post(post_url: str, pain_point: str, poster_company: str = "", po
             "post_text": meta["text"] or "",
             "image_url": meta["image"] or "",
             "likes": meta["likes"] or 0,
+            "posted_date": posted_date,
             "last_updated_at": now,
             **poster_fields,
         }).eq("id", post_id).execute()
@@ -167,6 +207,7 @@ def add_manual_post(post_url: str, pain_point: str, poster_company: str = "", po
             "comments": 0,
             "prev_likes": 0,
             "likes_increased": False,
+            "posted_date": posted_date,
             "first_seen_at": now,
             "last_updated_at": now,
             **poster_fields,
